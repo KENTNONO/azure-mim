@@ -97,9 +97,10 @@ def image_event(event):
     with open('./'+name_mp3, 'wb') as fd:
         for chunk in message_content.iter_content():
             fd.write(chunk)
-    os.system('ffmpeg -y -i ' + name_mp3 + ' ' + name_wav + ' -loglevel quiet')
-    text = transcribe(name_wav)
-    print('Transcribe:', text)
+    ##測試用
+    # os.system('ffmpeg -y -i ' + name_mp3 + ' ' + name_wav + ' -loglevel quiet')
+    # text = transcribe(name_wav)
+    # print('Transcribe:', text)
 
 ##剛加入、解黑名單
 @handler.add(FollowEvent)
