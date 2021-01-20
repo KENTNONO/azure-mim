@@ -12,15 +12,20 @@ from linebot.exceptions import (
 )
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, Event, FollowEvent, UnfollowEvent,
-    AudioMessage, ImageMessage
+    AudioMessage, ImageMessage, AudioSendMessage
 
 )
+
+from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+from msrest.authentication import CognitiveServicesCredentials
+import os, requests, uuid, json
+import urllib
 
 app = Flask(__name__)
 
 # get channel_secret and channel_access_token from your environment variable
-channel_secret = '504a7283dead7fe32c25108c0dd860ae'
-channel_access_token = '5h0VJAC9CHTZq6rmil6/mir4anwkeRaTMh/klI/5iz2UEvpE6MZb7QfMPcA/N6dcaprzKIMwqBKMc/FhlmJJnUafkKHjbXcVbOcQPv4ysg8VSN6JUmNywgdL6o+X0OzPH54mvtz1u3kdGOyIZzbJCAdB04t89/1O/w1cDnyilFU='
+channel_secret = ''
+channel_access_token = ''
 
 if channel_secret is None:
     print('Specify LINE_CHANNEL_SECRET as environment variable.')
@@ -31,6 +36,9 @@ if channel_access_token is None:
 
 line_bot_api = LineBotApi(channel_access_token)
 handler = WebhookHandler(channel_secret)
+
+
+
 
 ##為了測試是否有收到音
 def transcribe(wav_path):
@@ -81,14 +89,74 @@ def audio_event(event):
     print('audio')
     print(event)
     message_content = line_bot_api.get_message_content(event.message.id)
-
+    
     with open('./recordimage.jpg', 'wb') as fd:
         for chunk in message_content.iter_content():
             fd.write(chunk)
+    
+    subscription_key_pic = ''
+    endpoint_pic = ''
+    computervision_client_pic = ComputerVisionClient(endpoint_pic, CognitiveServicesCredentials(subscription_key_pic))
+    tags_result_remote_pic = ''
+    with open('./recordimage.jpg', "rb") as fi:
+        tags_result_remote_pic= computervision_client_pic.tag_image_in_stream(fi)
+
+    #把文字存下來
+    tags_name_pic1 = tags_result_remote_pic.tags[0].name
+    tags_name_pic2 = tags_result_remote_pic.tags[1].name
+
+    #翻譯文字
+    # -*- coding: utf-8 -*-
+    subscription_key_text = '' # your key
+    endpoint_text = ''
+    path_text = '/translate?api-version=3.0'
+
+    paramsh_text = '&to=zh-Hant'#中文
+    
+    constructed_url = endpoint_text + path_text + paramsh_text
+    headers = {
+        'Ocp-Apim-Subscription-Key': subscription_key_text,
+        'Content-type': 'application/json',
+        'X-ClientTraceId': str(uuid.uuid4())
+    }
+
+    #第一段的文字
+    body1 = [{
+        'text': tags_name_pic1
+    }]
+
+    request1 = requests.post(constructed_url, headers=headers, json=body1)
+    response1 = request1.json()
+    print(response1)
+    text_output1 = response1[0]["translations"][0]["text"]
+
+    #第二段的文字
+    body2 = [{
+        'text': tags_name_pic2
+    }]
+
+    request2 = requests.post(constructed_url, headers=headers, json=body2)
+    response2 = request2.json()
+
+    text_output2 = response2[0]["translations"][0]["text"]
+
+    #把他們全部都連接再一起
+    output = tags_name_pic1+" "+text_output1+" "+tags_name_pic2+" "+text_output2
+    output_url =  urllib.parse.quote(output)
+    url = 'https://google-translate-proxy.herokuapp.com/api/tts?query={}&language=zh-tw'.format(output_url)
+    line_bot_api.reply_message(
+        event.reply_token,
+        AudioSendMessage(original_content_url=url,duration=10000)
+    )
+    line_bot_api.reply_message(
+        event.reply_token,
+        TextSendMessage(text=tags_name_pic1+':'+tags_name_pic2)
+    )
+
 ##音訊輸入
 @handler.add(MessageEvent,message=AudioMessage)
 def image_event(event):
-    print('image')
+    print('audio')
     print(event)
     name_mp3 = 'recording.mp3'
     name_wav = 'recording.wav'
@@ -97,6 +165,10 @@ def image_event(event):
     with open('./'+name_mp3, 'wb') as fd:
         for chunk in message_content.iter_content():
             fd.write(chunk)
+    # line_bot_api.reply_message(
+    #     event.reply_token,
+    #     AudioSendMessage(original_content_url='https://www.sample-videos.com/audio/mp3/crowd-cheering.mp3',duration=10000)
+    # )
     ##測試用
     # os.system('ffmpeg -y -i ' + name_mp3 + ' ' + name_wav + ' -loglevel quiet')
     # text = transcribe(name_wav)
@@ -120,8 +192,6 @@ def unfollow_event(event):
     print(event)
 
 
-
-
 if __name__ == "__main__":
     # arg_parser = ArgumentParser(
     #     usage='Usage: python ' + __file__ + ' [--port <port>] [--help]'
@@ -131,3 +201,7 @@ if __name__ == "__main__":
     # options = arg_parser.parse_args()
     # app.run(debug=options.debug, port=options.port)
     app.run()
+
+
+
+
