@@ -127,7 +127,7 @@ def audio_event(event):
 
     request1 = requests.post(constructed_url, headers=headers, json=body1)
     response1 = request1.json()
-    print(response1)
+    
     text_output1 = response1[0]["translations"][0]["text"]
 
     #第二段的文字
@@ -146,12 +146,14 @@ def audio_event(event):
     url = 'https://google-translate-proxy.herokuapp.com/api/tts?query={}&language=zh-tw'.format(output_url)
     line_bot_api.reply_message(
         event.reply_token,
-        AudioSendMessage(original_content_url=url,duration=10000)
+        [AudioSendMessage(original_content_url=url,duration=10000),
+        TextSendMessage(text=tags_name_pic1+':'+tags_name_pic2),
+        TextSendMessage(text=text_output1+':'+text_output2)]
     )
-    line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=tags_name_pic1+':'+tags_name_pic2)
-    )
+    # line_bot_api.reply_message(
+    #     event.reply_token,
+    #     TextSendMessage(text=tags_name_pic1+':'+tags_name_pic2)
+    # )
 
 ##音訊輸入
 @handler.add(MessageEvent,message=AudioMessage)
